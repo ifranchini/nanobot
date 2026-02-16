@@ -1,0 +1,114 @@
+{
+    "name": "enhanced-web-search",
+    "version": "2.0.0",
+    "description": "Enhanced web search skill with orchestrator + sub-agent architecture",
+    
+    "providers": {
+        "search": {
+            "primary": "brave",
+            "fallback": "tavily",
+            "brave": {
+                "endpoint": "https://api.search.brave.com/res/v1/web/search",
+                "cost_per_1k": 5.0,
+                "rate_limit": 2000
+            },
+            "tavily": {
+                "endpoint": "https://api.tavily.com/search",
+                "cost_per_1k": 8.0,
+                "rate_limit": 1000
+            }
+        },
+        "content": {
+            "primary": "jina",
+            "jina": {
+                "reader_endpoint": "https://r.jina.ai/",
+                "search_endpoint": "https://s.jina.ai/",
+                "features": {
+                    "x-with-generated-alt": true,
+                    "x-return-format": "markdown"
+                },
+                "cost_per_1k_tokens": 0.0,
+                "note": "Free tier available, API key for higher limits"
+            }
+        },
+        "models": {
+            "orchestrator": {
+                "id": "moonshotai/kimi-k2.5",
+                "name": "Kimi K2.5",
+                "cost_in": 0.50,
+                "cost_out": 2.50,
+                "context": 262144,
+                "role": "Main orchestrator - decides when to search, synthesizes final answer"
+            },
+            "search_agent": {
+                "id": "google/gemini-2.5-flash-preview",
+                "name": "Gemini Flash 2.5",
+                "cost_in": 0.075,
+                "cost_out": 0.30,
+                "context": 1000000,
+                "role": "Web search sub-agent - executes searches, fetches content"
+            },
+            "vision": {
+                "id": "google/gemini-2.5-flash-preview",
+                "name": "Gemini Flash 2.5",
+                "cost_in": 0.075,
+                "cost_out": 0.30,
+                "role": "Image analysis when visual content is relevant"
+            },
+            "expert": {
+                "id": "anthropic/claude-opus-4",
+                "name": "Claude Opus 4",
+                "cost_in": 15.0,
+                "cost_out": 75.0,
+                "context": 200000,
+                "role": "Expert escalation - complex analysis when standard results insufficient"
+            }
+        }
+    },
+    
+    "security": {
+        "threat_levels": ["safe", "low", "medium", "high", "critical"],
+        "require_approval": ["high", "critical"],
+        "auto_block": ["critical"],
+        
+        "blocked_domains": [
+            "pastebin.com", "hastebin.com", "ghostbin.com", "paste.ee",
+            "justpaste.it", "bit.ly", "tinyurl.com", "t.co"
+        ],
+        
+        "injection_detection": {
+            "enabled": true,
+            "patterns_file": "security_patterns.json",
+            "sensitivity": "standard"
+        },
+        
+        "terminal_execution": {
+            "allow_without_approval": false,
+            "warning_message": "⚠️ This operation requires terminal execution. Approve? [y/N]"
+        }
+    },
+    
+    "defaults": {
+        "max_search_results": 5,
+        "max_pages_to_fetch": 3,
+        "max_images_per_page": 2,
+        "content_max_length": 40000,
+        "request_timeout": 25,
+        "fetch_content_by_default": true,
+        "analyze_images_by_default": false
+    },
+    
+    "cost_optimization": {
+        "use_cheap_model_for_search": true,
+        "escalate_only_when_needed": true,
+        "cache_results": true,
+        "cache_ttl_minutes": 30
+    },
+    
+    "nanobot_integration": {
+        "skill_name": "web_search",
+        "tool_names": ["search_web", "browse_page", "analyze_image"],
+        "auto_decide_search": true,
+        "include_in_default_tools": true
+    }
+}
