@@ -351,20 +351,26 @@ def gateway(
     
     # Set cron callback (needs agent)
     async def on_cron_job(job: CronJob) -> str | None:
-        """Execute a cron job through the agent."""
+        """Execute a cron job - deliver reminder or process through agent."""
+        from nanobot.bus.events import OutboundMessage
+        
+        # If deliver=True, just send the reminder message directly (don't process through agent)
+        if job.payload.deliver and job.payload.to:
+            reminder_msg = f"⏰ **Reminder**\n\n{job.payload.message}"
+            await bus.publish_outbound(OutboundMessage(
+                channel=job.payload.channel or "cli",
+                chat_id=job.payload.to,
+                content=reminder_msg
+            ))
+            return reminder_msg
+        
+        # Otherwise, process through agent (for agent_turn jobs)
         response = await agent.process_direct(
             job.payload.message,
             session_key=f"cron:{job.id}",
             channel=job.payload.channel or "cli",
             chat_id=job.payload.to or "direct",
         )
-        if job.payload.deliver and job.payload.to:
-            from nanobot.bus.events import OutboundMessage
-            await bus.publish_outbound(OutboundMessage(
-                channel=job.payload.channel or "cli",
-                chat_id=job.payload.to,
-                content=response or ""
-            ))
         return response
     cron.on_job = on_cron_job
     
