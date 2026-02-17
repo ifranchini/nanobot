@@ -2,16 +2,11 @@
 
 ## Deploy Changes
 
-⚠️ **Ask user to confirm before running**
+✅ **Safe to run directly** (standard deploy cycle)
 
 ```bash
-# On VPS
-ssh puma-vps
-cd /home/nanobot/nanobot
-git checkout stable
-git pull
-docker-compose down
-docker-compose up -d --build
+ssh puma-vps "sudo -u nanobot bash -c 'cd /home/nanobot/nanobot && git pull origin stable'"
+ssh puma-vps "sudo bash -c 'cd /home/nanobot/nanobot && docker build -t nanobot . && docker stop nanobot && docker rm nanobot && docker run -d --name nanobot --restart unless-stopped --env-file /home/nanobot/nanobot/.env -p 18790:18790 -v /home/nanobot/.nanobot:/root/.nanobot -v /home/nanobot/nanobot:/repo nanobot gateway'"
 ```
 
 ## View Logs
@@ -70,10 +65,10 @@ ssh puma-vps "for job in \$(atq | cut -f1); do atrm \$job; done"
 
 ## Restart Services
 
-⚠️ **Ask user to confirm before running**
+✅ **Safe to run directly**
 
 ```bash
-ssh puma-vps "cd /home/nanobot/nanobot && docker-compose restart"
+ssh puma-vps "sudo docker restart nanobot"
 ```
 
 ## Sync with Upstream

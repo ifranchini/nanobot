@@ -28,11 +28,27 @@ pytest -q                           # test
 
 Claude has SSH access to `puma-vps` where nanobot runs in Docker.
 
-- ✅ **Safe to run directly**: logs, status checks, `docker ps`, `cat`, `grep`
-- ⚠️ **Ask user first**: deploy, restart, `docker-compose down`, git operations, clear data
+### Always allowed (run without asking)
+
+- **Read-only inspection**: `docker ps`, `docker logs`, `docker inspect`, `docker exec ... cat/ls/grep/python3`
+- **System status**: `df -h`, `free -h`, `uptime`, `atq`, `at -c`
+- **Git read ops**: `git status`, `git log`, `git branch`, `git diff`, `git remote -v`
+- **File reads**: `cat`, `ls`, `head`, `tail`, `grep`, `find` on any nanobot path
+- **Config/memory views**: reading config.json, MEMORY.md, HISTORY.md, sessions
+- **Git pull**: `git pull origin stable` (safe — VPS always tracks stable)
+- **Docker build + restart**: `docker build`, `docker stop`, `docker rm`, `docker run` for the nanobot container — this is the standard deploy cycle
+- **File ownership fixes**: `chown -R nanobot:nanobot` on nanobot paths
+- **Testing inside container**: `docker exec nanobot python3 -c "..."` for verification
+
+### Ask user first
+
+- **Destructive data ops**: deleting workspace data, clearing memory/sessions, `rm -rf`
+- **Upstream sync**: `git reset --hard`, `git push --force`, rebasing branches
+- **Infrastructure changes**: modifying Docker volumes, ports, or system services
+- **Config edits**: changing config.json, .env files (API keys, tokens)
 
 ```bash
-ssh puma-vps "cd /home/nanobot/nanobot && docker-compose logs --tail=50"
+ssh puma-vps "cd /home/nanobot/nanobot && docker logs nanobot --tail=50"
 ```
 
 ## Architecture
