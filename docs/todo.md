@@ -2,11 +2,6 @@
 
 ## In Progress
 
-- [ ] Reddit skill implementation
-  - Research Reddit API/MCP options
-  - Implement subreddit monitoring
-  - Add to skills system
-
 ## Planned
 
 - [ ] Better memory management
@@ -27,6 +22,7 @@
 - [x] GitHub Action for automated upstream sync
 - [x] Branch strategy (main/my-modifications/stable)
 - [x] Claude Code documentation structure
+- [x] Reddit skill (JSON API browse & search, no auth required)
 
 ## Ideas / Backlog
 
