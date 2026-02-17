@@ -2,16 +2,17 @@ name: Sync Upstream
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Daily at 6 AM UTC
-  workflow_dispatch:  # Manual trigger
+    - cron: '0 6 * * *'
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout my-modifications
         uses: actions/checkout@v4
         with:
+          ref: my-modifications
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -24,7 +25,8 @@ jobs:
         run: |
           git remote add upstream https://github.com/HKUDS/nanobot.git
           git fetch upstream
-          git checkout main
+          git fetch origin main
+          git checkout -B main origin/main
           git reset --hard upstream/main
           git push origin main --force
 
@@ -39,8 +41,7 @@ jobs:
       - name: Update stable if rebase succeeded
         if: steps.rebase.outcome == 'success'
         run: |
-          git checkout stable
-          git reset --hard my-modifications
+          git checkout -B stable my-modifications
           git push origin stable --force
 
       - name: Notify if rebase failed
