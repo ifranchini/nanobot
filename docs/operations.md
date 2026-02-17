@@ -1,0 +1,138 @@
+# Operations Runbook
+
+## Deploy Changes
+
+⚠️ **Ask user to confirm before running**
+
+```bash
+# On VPS
+ssh puma-vps
+cd /home/nanobot/nanobot
+git checkout stable
+git pull
+docker-compose down
+docker-compose up -d --build
+```
+
+## View Logs
+
+✅ **Safe to run directly**
+
+```bash
+# Recent logs
+ssh puma-vps "cd /home/nanobot/nanobot && docker-compose logs --tail=100"
+
+# Follow logs
+ssh puma-vps "cd /home/nanobot/nanobot && docker-compose logs -f"
+
+# Specific service
+ssh puma-vps "cd /home/nanobot/nanobot && docker-compose logs nanobot --tail=50"
+```
+
+## Check Status
+
+✅ **Safe to run directly**
+
+```bash
+# Container status
+ssh puma-vps "docker ps"
+
+# Disk usage
+ssh puma-vps "df -h"
+
+# Memory
+ssh puma-vps "free -h"
+```
+
+## Check Cron Jobs
+
+✅ **Safe to run directly**
+
+```bash
+# List scheduled jobs
+ssh puma-vps "atq"
+
+# View job details
+ssh puma-vps "at -c <job_id>"
+```
+
+## Clear Stuck Cron Jobs
+
+⚠️ **Ask user to confirm before running**
+
+```bash
+# Remove specific job
+ssh puma-vps "atrm <job_id>"
+
+# Clear all (dangerous)
+ssh puma-vps "for job in \$(atq | cut -f1); do atrm \$job; done"
+```
+
+## Restart Services
+
+⚠️ **Ask user to confirm before running**
+
+```bash
+ssh puma-vps "cd /home/nanobot/nanobot && docker-compose restart"
+```
+
+## Sync with Upstream
+
+⚠️ **Ask user to confirm before running**
+
+Normally handled by GitHub Action. Manual sync:
+
+```bash
+# Local
+git fetch upstream
+git checkout main
+git reset --hard upstream/main
+git push origin main --force
+
+git checkout my-modifications
+git rebase main
+git push --force-with-lease
+
+git checkout stable
+git reset --hard my-modifications
+git push --force
+```
+
+## View Config
+
+✅ **Safe to run directly**
+
+```bash
+ssh puma-vps "cat /home/nanobot/.nanobot/config.json"
+```
+
+## View Memory
+
+✅ **Safe to run directly**
+
+```bash
+ssh puma-vps "cat /home/nanobot/.nanobot/workspace/MEMORY.md"
+ssh puma-vps "tail -50 /home/nanobot/.nanobot/workspace/HISTORY.md"
+```
+
+## Troubleshooting
+
+### Bot not responding
+1. Check container is running: `docker ps`
+2. Check logs for errors: `docker-compose logs --tail=100`
+3. Verify config has valid API keys
+
+### Reminders not firing
+1. Check `atd` service: `systemctl status atd`
+2. List pending jobs: `atq`
+3. Verify job content: `at -c <job_id>`
+
+### Memory not persisting
+1. Check workspace permissions
+2. Verify MEMORY.md exists and is writable
+3. Check Docker volume mounts
+
+### Channel disconnected
+1. Check channel-specific logs
+2. Verify API tokens in config
+3. Restart gateway: `docker-compose restart`
