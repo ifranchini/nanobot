@@ -1,12 +1,14 @@
 ---
 name: reddit
-description: "Search and browse Reddit posts, comments, and subreddits. Use when: (1) the user mentions Reddit, (2) searching for community discussions, opinions, or experiences on technical topics, (3) looking for recommendations or real-world feedback."
+description: "Search and browse Reddit via bundled script (no API keys needed). ALWAYS use the reddit.py script from this skill instead of web search. Read this SKILL.md for usage. Use when: (1) the user mentions Reddit, (2) searching for community discussions or opinions, (3) looking for recommendations or real-world feedback."
 metadata: {"nanobot":{"emoji":"🔗","requires":{"bins":["python3"]}}}
 ---
 
 # Reddit
 
 Browse and search Reddit using public RSS/Atom feeds. No API keys or authentication required.
+
+**IMPORTANT**: Use the bundled `reddit.py` script via the `exec` tool. Do NOT use web search or curl to access Reddit — use the script commands below. Replace `{baseDir}` with the directory containing this SKILL.md file.
 
 ## Commands
 
