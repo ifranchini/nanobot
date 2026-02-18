@@ -30,6 +30,13 @@ jobs:
           git reset --hard upstream/main
           git push origin main --force
 
+      - name: Snapshot custom commits before rebase
+        id: snapshot
+        run: |
+          echo "commits_before=$(git rev-list --count main..my-modifications)" >> "$GITHUB_OUTPUT"
+          git log --oneline main..my-modifications > /tmp/commits_before.txt
+          cat /tmp/commits_before.txt
+
       - name: Rebase my-modifications onto main
         id: rebase
         continue-on-error: true
@@ -38,13 +45,43 @@ jobs:
           git rebase main
           git push origin my-modifications --force-with-lease
 
-      - name: Update stable if rebase succeeded
+      - name: Verify no commits were silently dropped
         if: steps.rebase.outcome == 'success'
+        id: verify
+        run: |
+          BEFORE=${{ steps.snapshot.outputs.commits_before }}
+          AFTER=$(git rev-list --count main..my-modifications)
+          echo "Commits before rebase: $BEFORE"
+          echo "Commits after rebase: $AFTER"
+          if [ "$AFTER" -lt "$BEFORE" ]; then
+            echo "dropped=true" >> "$GITHUB_OUTPUT"
+            echo "::error::Rebase dropped commits! Before: $BEFORE, After: $AFTER"
+          else
+            echo "dropped=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update stable if rebase succeeded and no commits dropped
+        if: steps.rebase.outcome == 'success' && steps.verify.outputs.dropped != 'true'
         run: |
           git checkout -B stable my-modifications
           git push origin stable --force
 
-      - name: Notify if rebase failed
+      - name: Alert on rebase failure
         if: steps.rebase.outcome == 'failure'
         run: |
-          echo "::warning::Rebase failed - manual intervention needed. Stable branch unchanged."
+          echo "::error::Rebase failed - manual intervention needed. Stable branch unchanged."
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="Markdown" \
+            -d text="⚠️ *Nanobot Sync Failed*%0A%0ARebase of my-modifications onto main failed. Manual intervention needed.%0A%0ACustom commits at risk:%0A$(cat /tmp/commits_before.txt | head -10)" \
+            || echo "Telegram notification failed (secrets may not be configured)"
+
+      - name: Alert on dropped commits
+        if: steps.verify.outputs.dropped == 'true'
+        run: |
+          echo "::error::Commits were dropped during rebase! Aborting stable update."
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="Markdown" \
+            -d text="⚠️ *Nanobot Sync - Commits Dropped!*%0A%0ARebase succeeded but lost commits. Stable NOT updated.%0A%0ABefore: ${{ steps.snapshot.outputs.commits_before }}, After: $(git rev-list --count main..my-modifications)%0A%0ACheck Actions log and resolve manually." \
+            || echo "Telegram notification failed (secrets may not be configured)"
