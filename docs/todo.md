@@ -2,8 +2,6 @@
 
 ## In Progress
 
-- [ ] Google Workspace skill (Calendar, Docs, Sheets, Slides via OAuth2)
-
 ## Planned
 
 - [ ] Better memory management
@@ -25,6 +23,7 @@
 - [x] Branch strategy (main/my-modifications/stable)
 - [x] Claude Code documentation structure
 - [x] Reddit skill (JSON API browse & search, no auth required)
+- [x] Google Workspace skill (Calendar, Docs, Sheets, Slides via OAuth2)
 
 ## Ideas / Backlog
 
