@@ -69,6 +69,13 @@ See @docs/architecture.md for detailed module breakdown.
 | `nanobot/config/` | Pydantic v2 config (schema.py, loader.py) |
 | `~/.nanobot/` | Runtime config, memory, sessions |
 
+## Task Tracking
+
+**ALWAYS update `docs/todo.md`** when working on tasks:
+- Move items to "In Progress" when starting work
+- Move items to "Completed" when done
+- Add new items to "Planned" or "Ideas / Backlog" when discovered
+
 ## Code Style
 
 - **ruff**: lint + format, line-length 100, Python 3.13
