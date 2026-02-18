@@ -54,17 +54,17 @@ class MessageBus:
         Run this as a background task.
         """
         self._running = True
-        while self._running:
-            try:
-                msg = await asyncio.wait_for(self.outbound.get(), timeout=1.0)
+        try:
+            while self._running:
+                msg = await self.outbound.get()
                 subscribers = self._outbound_subscribers.get(msg.channel, [])
                 for callback in subscribers:
                     try:
                         await callback(msg)
                     except Exception as e:
                         logger.error(f"Error dispatching to {msg.channel}: {e}")
-            except asyncio.TimeoutError:
-                continue
+        except asyncio.CancelledError:
+            pass
     
     def stop(self) -> None:
         """Stop the dispatcher loop."""

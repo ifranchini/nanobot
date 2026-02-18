@@ -183,16 +183,18 @@ class ChannelManager:
                 logger.error(f"Error stopping {name}: {e}")
     
     async def _dispatch_outbound(self) -> None:
-        """Dispatch outbound messages to the appropriate channel."""
+        """Dispatch outbound messages to the appropriate channel.
+
+        Uses direct Queue.get() instead of wait_for() to avoid a race condition
+        where messages can be lost if timeout fires at the exact moment a message
+        is enqueued. Stopping is handled by task cancellation in stop_all().
+        """
         logger.info("Outbound dispatcher started")
-        
-        while True:
-            try:
-                msg = await asyncio.wait_for(
-                    self.bus.consume_outbound(),
-                    timeout=1.0
-                )
-                
+
+        try:
+            while True:
+                msg = await self.bus.consume_outbound()
+
                 logger.debug(f"Outbound dispatch: {msg.channel}:{msg.chat_id} ({len(msg.content or '')} chars)")
                 channel = self.channels.get(msg.channel)
                 if channel:
@@ -203,11 +205,8 @@ class ChannelManager:
                         logger.error(f"Error sending to {msg.channel}: {e}")
                 else:
                     logger.warning(f"Unknown channel: {msg.channel}")
-                    
-            except asyncio.TimeoutError:
-                continue
-            except asyncio.CancelledError:
-                break
+        except asyncio.CancelledError:
+            pass
     
     def get_channel(self, name: str) -> BaseChannel | None:
         """Get a channel by name."""
