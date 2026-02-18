@@ -115,6 +115,12 @@ python3 {baseDir}/scripts/google_workspace.py sheets append SPREADSHEET_ID --ran
 Create a new presentation:
 ```bash
 python3 {baseDir}/scripts/google_workspace.py slides create --title "My Presentation"
+python3 {baseDir}/scripts/google_workspace.py slides create --title "My Presentation" --template TEMPLATE_PRESENTATION_ID
+```
+
+List slides (to get slide IDs for images):
+```bash
+python3 {baseDir}/scripts/google_workspace.py slides list PRESENTATION_ID
 ```
 
 Add a slide:
@@ -122,9 +128,24 @@ Add a slide:
 python3 {baseDir}/scripts/google_workspace.py slides add-slide PRESENTATION_ID --title "Slide Title" --body "Slide content goes here"
 ```
 
+Add an image to a slide (use `slides list` first to get the slide ID):
+```bash
+python3 {baseDir}/scripts/google_workspace.py slides add-image PRESENTATION_ID --slide-id SLIDE_ID --url "https://example.com/image.png"
+python3 {baseDir}/scripts/google_workspace.py slides add-image PRESENTATION_ID --slide-id SLIDE_ID --url "https://example.com/image.png" --width 6 --height 4 --x 2 --y 1.5
+```
+
+Set theme colors (presets: dark, light, blue, warm):
+```bash
+python3 {baseDir}/scripts/google_workspace.py slides set-colors PRESENTATION_ID --preset dark
+python3 {baseDir}/scripts/google_workspace.py slides set-colors PRESENTATION_ID --preset blue
+python3 {baseDir}/scripts/google_workspace.py slides set-colors PRESENTATION_ID --colors '{"ACCENT1": [0.2, 0.5, 0.9], "ACCENT2": [0.1, 0.7, 0.3]}'
+```
+
 ## Tips
 
 - Run `auth` once to set up credentials; the token auto-refreshes after that
+- **Images must be at a publicly accessible URL**. The API fetches the image at insertion time and stores a copy in the presentation.
+- **Theme swapping is not supported** by the Google API. Use `--template` to start from a themed presentation, or `set-colors` to modify the color scheme. Presets: `dark`, `light`, `blue`, `warm`.
 - Calendar defaults to your primary calendar; use `--calendar-id` for others
 - Sheets `--data` expects a JSON array of arrays (rows of cells)
 - All IDs can be found in the Google Docs/Sheets/Slides URL (the long string between `/d/` and `/edit`)

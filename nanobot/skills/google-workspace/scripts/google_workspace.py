@@ -620,17 +620,80 @@ def cmd_sheets_append(args):
 # ── Slides ───────────────────────────────────────────────────────────────
 
 
+COLOR_PRESETS = {
+    "dark": {
+        "DARK1": (0.1, 0.1, 0.1),
+        "LIGHT1": (0.95, 0.95, 0.95),
+        "DARK2": (0.2, 0.2, 0.25),
+        "LIGHT2": (0.85, 0.85, 0.88),
+        "ACCENT1": (0.4, 0.6, 1.0),
+        "ACCENT2": (0.3, 0.8, 0.5),
+        "ACCENT3": (1.0, 0.7, 0.2),
+        "ACCENT4": (0.9, 0.3, 0.3),
+        "ACCENT5": (0.7, 0.4, 0.9),
+        "ACCENT6": (0.2, 0.7, 0.7),
+    },
+    "light": {
+        "DARK1": (0.15, 0.15, 0.15),
+        "LIGHT1": (1.0, 1.0, 1.0),
+        "DARK2": (0.3, 0.3, 0.3),
+        "LIGHT2": (0.96, 0.96, 0.96),
+        "ACCENT1": (0.26, 0.52, 0.96),
+        "ACCENT2": (0.2, 0.66, 0.33),
+        "ACCENT3": (1.0, 0.72, 0.0),
+        "ACCENT4": (0.82, 0.18, 0.18),
+        "ACCENT5": (0.61, 0.4, 0.71),
+        "ACCENT6": (0.0, 0.61, 0.58),
+    },
+    "blue": {
+        "DARK1": (0.05, 0.1, 0.2),
+        "LIGHT1": (0.93, 0.96, 1.0),
+        "DARK2": (0.1, 0.2, 0.35),
+        "LIGHT2": (0.85, 0.9, 0.97),
+        "ACCENT1": (0.1, 0.4, 0.8),
+        "ACCENT2": (0.0, 0.6, 0.7),
+        "ACCENT3": (0.2, 0.7, 0.9),
+        "ACCENT4": (0.9, 0.4, 0.2),
+        "ACCENT5": (0.5, 0.3, 0.8),
+        "ACCENT6": (0.1, 0.5, 0.5),
+    },
+    "warm": {
+        "DARK1": (0.2, 0.12, 0.08),
+        "LIGHT1": (1.0, 0.97, 0.94),
+        "DARK2": (0.35, 0.2, 0.12),
+        "LIGHT2": (0.95, 0.9, 0.85),
+        "ACCENT1": (0.85, 0.4, 0.15),
+        "ACCENT2": (0.7, 0.2, 0.2),
+        "ACCENT3": (1.0, 0.75, 0.3),
+        "ACCENT4": (0.6, 0.3, 0.1),
+        "ACCENT5": (0.8, 0.5, 0.2),
+        "ACCENT6": (0.5, 0.7, 0.3),
+    },
+}
+
+
 def cmd_slides_create(args):
-    """Create a new Google Slides presentation."""
-    service = _build_service(args, "slides", "v1")
+    """Create a new Google Slides presentation, optionally from a template."""
+    if args.template:
+        # Copy from template via Drive API
+        drive = _build_service(args, "drive", "v3")
+        try:
+            copy = drive.files().copy(fileId=args.template, body={"name": args.title}).execute()
+        except Exception as e:
+            _handle_api_error(e)
 
-    try:
-        presentation = service.presentations().create(body={"title": args.title}).execute()
-    except Exception as e:
-        _handle_api_error(e)
+        pres_id = copy["id"]
+        print(f"Presentation created from template: **{args.title}**")
+    else:
+        service = _build_service(args, "slides", "v1")
+        try:
+            presentation = service.presentations().create(body={"title": args.title}).execute()
+        except Exception as e:
+            _handle_api_error(e)
 
-    pres_id = presentation["presentationId"]
-    print(f"Presentation created: **{args.title}**")
+        pres_id = presentation["presentationId"]
+        print(f"Presentation created: **{args.title}**")
+
     print(f"ID: {pres_id}")
     print(f"Link: https://docs.google.com/presentation/d/{pres_id}/edit")
 
@@ -696,6 +759,193 @@ def cmd_slides_add_slide(args):
 
     print(f"Slide added to presentation: {args.presentation_id}")
     print(f"Slide ID: {slide_id}")
+
+
+def cmd_slides_list(args):
+    """List slides in a presentation with their IDs."""
+    service = _build_service(args, "slides", "v1")
+
+    try:
+        presentation = service.presentations().get(presentationId=args.presentation_id).execute()
+    except Exception as e:
+        _handle_api_error(e)
+
+    slides = presentation.get("slides", [])
+    title = presentation.get("title", "Untitled")
+    print(f"# {title}\n")
+
+    if not slides:
+        print("No slides found.")
+        return
+
+    print(f"Found {len(slides)} slide(s):\n")
+    for i, slide in enumerate(slides, 1):
+        slide_id = slide["objectId"]
+        # Try to extract title text from the slide
+        slide_title = ""
+        for element in slide.get("pageElements", []):
+            shape = element.get("shape")
+            if not shape:
+                continue
+            placeholder = shape.get("placeholder")
+            if placeholder and placeholder.get("type") == "TITLE":
+                text_elements = shape.get("text", {}).get("textElements", [])
+                for te in text_elements:
+                    text_run = te.get("textRun")
+                    if text_run:
+                        slide_title += text_run.get("content", "").strip()
+
+        display = f"**{slide_title}**" if slide_title else "(No title)"
+        print(f"{i}. {display}")
+        print(f"   ID: {slide_id}")
+        print()
+
+
+def cmd_slides_add_image(args):
+    """Add an image to a slide from a URL."""
+    import uuid
+
+    service = _build_service(args, "slides", "v1")
+
+    image_id = f"img_{uuid.uuid4().hex[:8]}"
+
+    # EMU = English Metric Unit, 1 inch = 914400 EMU
+    emu_per_inch = 914400
+
+    # Default: centered, 5 inches wide
+    width = args.width or 5.0
+    height = args.height or 3.5
+    x = args.x if args.x is not None else 2.5
+    y = args.y if args.y is not None else 2.0
+
+    request = {
+        "createImage": {
+            "objectId": image_id,
+            "url": args.url,
+            "elementProperties": {
+                "pageObjectId": args.slide_id,
+                "size": {
+                    "width": {"magnitude": int(width * emu_per_inch), "unit": "EMU"},
+                    "height": {"magnitude": int(height * emu_per_inch), "unit": "EMU"},
+                },
+                "transform": {
+                    "scaleX": 1,
+                    "scaleY": 1,
+                    "translateX": int(x * emu_per_inch),
+                    "translateY": int(y * emu_per_inch),
+                    "unit": "EMU",
+                },
+            },
+        }
+    }
+
+    try:
+        service.presentations().batchUpdate(
+            presentationId=args.presentation_id,
+            body={"requests": [request]},
+        ).execute()
+    except Exception as e:
+        _handle_api_error(e)
+
+    print(f"Image added to slide: {args.slide_id}")
+    print(f"Image ID: {image_id}")
+
+
+def cmd_slides_set_colors(args):
+    """Set the theme color scheme on a presentation's master page."""
+    service = _build_service(args, "slides", "v1")
+
+    # Get master page ID
+    try:
+        presentation = service.presentations().get(presentationId=args.presentation_id).execute()
+    except Exception as e:
+        _handle_api_error(e)
+
+    masters = presentation.get("masters", [])
+    if not masters:
+        print("Error: No master pages found in presentation.", file=sys.stderr)
+        sys.exit(1)
+
+    master_id = masters[0]["objectId"]
+
+    # Build color scheme
+    if args.preset:
+        if args.preset not in COLOR_PRESETS:
+            print(
+                f"Error: Unknown preset '{args.preset}'. "
+                f"Available: {', '.join(COLOR_PRESETS.keys())}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        colors = COLOR_PRESETS[args.preset]
+    elif args.colors:
+        try:
+            colors = json.loads(args.colors)
+        except json.JSONDecodeError as e:
+            print(f"Error: Invalid JSON for --colors: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print("Error: Provide --preset or --colors.", file=sys.stderr)
+        sys.exit(1)
+
+    # Build the color scheme array
+    color_entries = []
+    required_types = [
+        "DARK1",
+        "LIGHT1",
+        "DARK2",
+        "LIGHT2",
+        "ACCENT1",
+        "ACCENT2",
+        "ACCENT3",
+        "ACCENT4",
+        "ACCENT5",
+        "ACCENT6",
+        "HYPERLINK",
+        "FOLLOWED_HYPERLINK",
+    ]
+
+    for color_type in required_types:
+        if color_type in colors:
+            rgb = colors[color_type]
+            if isinstance(rgb, (list, tuple)):
+                r, g, b = rgb
+            else:
+                r, g, b = rgb["red"], rgb["green"], rgb["blue"]
+        elif color_type == "HYPERLINK":
+            r, g, b = 0.067, 0.333, 0.8
+        elif color_type == "FOLLOWED_HYPERLINK":
+            r, g, b = 0.6, 0.2, 0.8
+        else:
+            continue
+
+        color_entries.append(
+            {
+                "type": color_type,
+                "color": {"red": r, "green": g, "blue": b},
+            }
+        )
+
+    request = {
+        "updatePageProperties": {
+            "objectId": master_id,
+            "pageProperties": {
+                "colorScheme": {"colors": color_entries},
+            },
+            "fields": "colorScheme.colors",
+        }
+    }
+
+    try:
+        service.presentations().batchUpdate(
+            presentationId=args.presentation_id,
+            body={"requests": [request]},
+        ).execute()
+    except Exception as e:
+        _handle_api_error(e)
+
+    label = args.preset if args.preset else "custom"
+    print(f"Color scheme updated to '{label}' on presentation: {args.presentation_id}")
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────
@@ -807,12 +1057,40 @@ def main():
     # slides create
     p = slides_sub.add_parser("create", help="Create a new presentation")
     p.add_argument("--title", required=True, help="Presentation title")
+    p.add_argument("--template", help="Template presentation ID to copy from")
 
     # slides add-slide
     p = slides_sub.add_parser("add-slide", help="Add a slide")
     p.add_argument("presentation_id", help="Presentation ID")
     p.add_argument("--title", help="Slide title")
     p.add_argument("--body", help="Slide body text")
+
+    # slides list
+    p = slides_sub.add_parser("list", help="List slides with IDs")
+    p.add_argument("presentation_id", help="Presentation ID")
+
+    # slides add-image
+    p = slides_sub.add_parser("add-image", help="Add image from URL")
+    p.add_argument("presentation_id", help="Presentation ID")
+    p.add_argument("--slide-id", required=True, help="Slide object ID (from 'slides list')")
+    p.add_argument("--url", required=True, help="Public image URL")
+    p.add_argument("--width", type=float, help="Width in inches (default: 5.0)")
+    p.add_argument("--height", type=float, help="Height in inches (default: 3.5)")
+    p.add_argument("--x", type=float, help="X position in inches from left (default: 2.5)")
+    p.add_argument("--y", type=float, help="Y position in inches from top (default: 2.0)")
+
+    # slides set-colors
+    p = slides_sub.add_parser("set-colors", help="Set theme color scheme")
+    p.add_argument("presentation_id", help="Presentation ID")
+    p.add_argument(
+        "--preset",
+        choices=["dark", "light", "blue", "warm"],
+        help="Use a built-in color preset",
+    )
+    p.add_argument(
+        "--colors",
+        help='Custom colors as JSON: {"ACCENT1": [r,g,b], ...} (values 0.0-1.0)',
+    )
 
     args = parser.parse_args()
 
@@ -848,6 +1126,9 @@ def main():
         handlers = {
             "create": cmd_slides_create,
             "add-slide": cmd_slides_add_slide,
+            "list": cmd_slides_list,
+            "add-image": cmd_slides_add_image,
+            "set-colors": cmd_slides_set_colors,
         }
         handlers[args.action](args)
 
