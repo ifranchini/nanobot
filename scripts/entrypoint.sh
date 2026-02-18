@@ -2,14 +2,22 @@
 # Docker entrypoint: sync builtin skills with scripts into the workspace,
 # then exec the nanobot command.
 #
-# Builtin skills live at /app/nanobot/skills/ (baked into image).
+# Skills source priority:
+#   1. /repo/nanobot/skills/ (git repo volume mount — latest code)
+#   2. /app/nanobot/skills/  (baked into image — fallback)
+#
 # The workspace at /root/.nanobot/workspace/skills/ is where the agent
 # can actually execute scripts (restrictToWorkspace=true).
 #
-# This copies any builtin skill that has a scripts/ directory into the
-# workspace, without overwriting user-created workspace skills.
+# This always syncs skills that have a scripts/ directory into workspace,
+# ensuring quick deploys (restart without rebuild) pick up latest code.
 
-BUILTIN="/app/nanobot/skills"
+if [ -d "/repo/nanobot/skills" ]; then
+    BUILTIN="/repo/nanobot/skills"
+else
+    BUILTIN="/app/nanobot/skills"
+fi
+
 WORKSPACE="/root/.nanobot/workspace/skills"
 
 if [ -d "$BUILTIN" ]; then
@@ -18,14 +26,6 @@ if [ -d "$BUILTIN" ]; then
         skill_name=$(basename "$skill_dir")
         # Only sync skills that have bundled scripts
         if [ -d "$skill_dir/scripts" ]; then
-            # Skip if workspace already has a user-modified version
-            # (user version takes priority if SKILL.md is newer)
-            ws_skill="$WORKSPACE/$skill_name/SKILL.md"
-            bi_skill="$skill_dir/SKILL.md"
-            if [ -f "$ws_skill" ] && [ "$ws_skill" -nt "$bi_skill" ]; then
-                continue
-            fi
-            # Sync the skill
             mkdir -p "$WORKSPACE/$skill_name"
             cp -r "$skill_dir"/* "$WORKSPACE/$skill_name/"
         fi
