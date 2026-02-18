@@ -25,6 +25,12 @@ COPY nanobot/ nanobot/
 COPY bridge/ bridge/
 RUN uv pip install --system --no-cache .
 
+# Google Workspace skill dependencies
+RUN uv pip install --system --no-cache \
+    google-api-python-client \
+    google-auth-httplib2 \
+    google-auth-oauthlib
+
 # Build the WhatsApp bridge
 WORKDIR /app/bridge
 RUN npm install && npm run build

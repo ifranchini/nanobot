@@ -2,6 +2,8 @@
 
 ## In Progress
 
+- [ ] Google Workspace skill (Calendar, Docs, Sheets, Slides via OAuth2)
+
 ## Planned
 
 - [ ] Better memory management
