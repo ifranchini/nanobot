@@ -1,6 +1,6 @@
 ---
 name: google-workspace
-description: "Manage Google Calendar, Docs, Sheets, and Slides via bundled script. ALWAYS use the google_workspace.py script from this skill instead of web search. Read this SKILL.md for usage. Use when: (1) the user mentions calendar events or scheduling, (2) creating or editing Google Docs, (3) working with spreadsheets or Google Sheets, (4) creating presentations or Google Slides, (5) any Google Workspace task."
+description: "Manage Google Calendar, Docs, Sheets, Slides, and Gmail via bundled script. ALWAYS use the google_workspace.py script from this skill instead of web search. Read this SKILL.md for usage. Use when: (1) the user mentions calendar events or scheduling, (2) creating or editing Google Docs, (3) working with spreadsheets or Google Sheets, (4) creating presentations or Google Slides, (5) reading or sending emails, (6) any Google Workspace task."
 metadata: {"nanobot":{"emoji":"\ud83d\udcc5","requires":{"bins":["python3"]}}}
 ---
 
@@ -141,9 +141,36 @@ python3 {baseDir}/scripts/google_workspace.py slides set-colors PRESENTATION_ID 
 python3 {baseDir}/scripts/google_workspace.py slides set-colors PRESENTATION_ID --colors '{"ACCENT1": [0.2, 0.5, 0.9], "ACCENT2": [0.1, 0.7, 0.3]}'
 ```
 
+### Gmail
+
+List recent messages:
+```bash
+python3 {baseDir}/scripts/google_workspace.py gmail list --limit 10
+python3 {baseDir}/scripts/google_workspace.py gmail list --query "is:unread" --limit 5
+```
+
+Read a specific message:
+```bash
+python3 {baseDir}/scripts/google_workspace.py gmail read MESSAGE_ID
+```
+
+Send an email:
+```bash
+python3 {baseDir}/scripts/google_workspace.py gmail send --to "someone@example.com" --subject "Hello" --body "Message content here"
+python3 {baseDir}/scripts/google_workspace.py gmail send --to "someone@example.com" --subject "Hello" --body "Message content" --cc "other@example.com"
+```
+
+Search messages (uses Gmail search syntax):
+```bash
+python3 {baseDir}/scripts/google_workspace.py gmail search "from:someone@example.com"
+python3 {baseDir}/scripts/google_workspace.py gmail search "subject:invoice after:2025/01/01" --limit 5
+python3 {baseDir}/scripts/google_workspace.py gmail search "has:attachment filename:pdf"
+```
+
 ## Tips
 
 - Run `auth` once to set up credentials; the token auto-refreshes after that
+- **Gmail search** uses the same syntax as the Gmail search bar (e.g., `is:unread`, `from:`, `subject:`, `has:attachment`, `after:`, `before:`)
 - **Images must be at a publicly accessible URL**. The API fetches the image at insertion time and stores a copy in the presentation.
 - **Theme swapping is not supported** by the Google API. Use `--template` to start from a themed presentation, or `set-colors` to modify the color scheme. Presets: `dark`, `light`, `blue`, `warm`.
 - Calendar defaults to your primary calendar; use `--calendar-id` for others

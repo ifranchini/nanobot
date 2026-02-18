@@ -15,6 +15,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/presentations",
     "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
 ]
 
 
@@ -948,11 +950,226 @@ def cmd_slides_set_colors(args):
     print(f"Color scheme updated to '{label}' on presentation: {args.presentation_id}")
 
 
+# ── Gmail ────────────────────────────────────────────────────────────────
+
+
+def _decode_body(payload) -> str:
+    """Extract plain text body from a Gmail message payload."""
+    import base64
+
+    # Simple message with body data directly
+    if payload.get("body", {}).get("data"):
+        return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="replace")
+
+    # Multipart — look for text/plain first, then text/html
+    parts = payload.get("parts", [])
+    for preferred in ("text/plain", "text/html"):
+        for part in parts:
+            if part.get("mimeType") == preferred and part.get("body", {}).get("data"):
+                text = base64.urlsafe_b64decode(part["body"]["data"]).decode(
+                    "utf-8", errors="replace"
+                )
+                if preferred == "text/html":
+                    import re
+
+                    text = re.sub(r"<[^>]+>", "", text)
+                    text = re.sub(r"\n{3,}", "\n\n", text)
+                return text.strip()
+
+            # Nested multipart
+            nested = part.get("parts", [])
+            for sub in nested:
+                if sub.get("mimeType") == preferred and sub.get("body", {}).get("data"):
+                    text = base64.urlsafe_b64decode(sub["body"]["data"]).decode(
+                        "utf-8", errors="replace"
+                    )
+                    if preferred == "text/html":
+                        import re
+
+                        text = re.sub(r"<[^>]+>", "", text)
+                        text = re.sub(r"\n{3,}", "\n\n", text)
+                    return text.strip()
+
+    return "(No text content)"
+
+
+def _get_header(headers, name) -> str:
+    """Get a header value from a list of Gmail headers."""
+    for h in headers:
+        if h["name"].lower() == name.lower():
+            return h["value"]
+    return ""
+
+
+def cmd_gmail_list(args):
+    """List recent Gmail messages."""
+    service = _build_service(args, "gmail", "v1")
+
+    query = args.query or ""
+    try:
+        result = (
+            service.users().messages().list(userId="me", q=query, maxResults=args.limit).execute()
+        )
+    except Exception as e:
+        _handle_api_error(e)
+
+    messages = result.get("messages", [])
+    if not messages:
+        print("No messages found.")
+        return
+
+    print(f"Found {len(messages)} message(s):\n")
+    for msg_info in messages:
+        try:
+            msg = (
+                service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=msg_info["id"],
+                    format="metadata",
+                    metadataHeaders=["From", "Subject", "Date"],
+                )
+                .execute()
+            )
+        except Exception as e:
+            _handle_api_error(e)
+
+        headers = msg.get("payload", {}).get("headers", [])
+        subject = _get_header(headers, "Subject") or "(No subject)"
+        sender = _get_header(headers, "From")
+        date = _get_header(headers, "Date")
+        snippet = msg.get("snippet", "")
+        labels = msg.get("labelIds", [])
+        unread = "UNREAD" in labels
+
+        marker = "[NEW] " if unread else ""
+        print(f"- {marker}**{subject}**")
+        if sender:
+            print(f"  From: {sender}")
+        if date:
+            print(f"  Date: {date}")
+        if snippet:
+            print(f"  {snippet[:120]}")
+        print(f"  ID: {msg_info['id']}")
+        print()
+
+
+def cmd_gmail_read(args):
+    """Read a specific Gmail message."""
+    service = _build_service(args, "gmail", "v1")
+
+    try:
+        msg = (
+            service.users().messages().get(userId="me", id=args.message_id, format="full").execute()
+        )
+    except Exception as e:
+        _handle_api_error(e)
+
+    headers = msg.get("payload", {}).get("headers", [])
+    subject = _get_header(headers, "Subject") or "(No subject)"
+    sender = _get_header(headers, "From")
+    to = _get_header(headers, "To")
+    date = _get_header(headers, "Date")
+
+    print(f"# {subject}\n")
+    if sender:
+        print(f"**From**: {sender}")
+    if to:
+        print(f"**To**: {to}")
+    if date:
+        print(f"**Date**: {date}")
+    print()
+
+    body = _decode_body(msg.get("payload", {}))
+    print(body)
+
+
+def cmd_gmail_send(args):
+    """Send a Gmail message."""
+    import base64
+    from email.mime.text import MIMEText
+
+    service = _build_service(args, "gmail", "v1")
+
+    message = MIMEText(args.body)
+    message["to"] = args.to
+    message["subject"] = args.subject
+    if args.cc:
+        message["cc"] = args.cc
+
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+
+    try:
+        sent = service.users().messages().send(userId="me", body={"raw": raw}).execute()
+    except Exception as e:
+        _handle_api_error(e)
+
+    print(f"Message sent to: {args.to}")
+    print(f"Subject: {args.subject}")
+    print(f"ID: {sent['id']}")
+
+
+def cmd_gmail_search(args):
+    """Search Gmail messages."""
+    service = _build_service(args, "gmail", "v1")
+
+    try:
+        result = (
+            service.users()
+            .messages()
+            .list(userId="me", q=args.query, maxResults=args.limit)
+            .execute()
+        )
+    except Exception as e:
+        _handle_api_error(e)
+
+    messages = result.get("messages", [])
+    if not messages:
+        print(f"No messages found for: {args.query}")
+        return
+
+    print(f"Found {len(messages)} result(s) for '{args.query}':\n")
+    for msg_info in messages:
+        try:
+            msg = (
+                service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=msg_info["id"],
+                    format="metadata",
+                    metadataHeaders=["From", "Subject", "Date"],
+                )
+                .execute()
+            )
+        except Exception as e:
+            _handle_api_error(e)
+
+        headers = msg.get("payload", {}).get("headers", [])
+        subject = _get_header(headers, "Subject") or "(No subject)"
+        sender = _get_header(headers, "From")
+        date = _get_header(headers, "Date")
+        snippet = msg.get("snippet", "")
+
+        print(f"- **{subject}**")
+        if sender:
+            print(f"  From: {sender}")
+        if date:
+            print(f"  Date: {date}")
+        if snippet:
+            print(f"  {snippet[:120]}")
+        print(f"  ID: {msg_info['id']}")
+        print()
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Google Workspace: Calendar, Docs, Sheets, Slides")
+    parser = argparse.ArgumentParser(
+        description="Google Workspace: Calendar, Docs, Sheets, Slides, Gmail"
+    )
     parser.add_argument(
         "--creds-dir",
         help=f"Credentials directory (default: {DEFAULT_CREDS_DIR})",
@@ -1092,6 +1309,31 @@ def main():
         help='Custom colors as JSON: {"ACCENT1": [r,g,b], ...} (values 0.0-1.0)',
     )
 
+    # ── gmail ──
+    gmail_parser = subparsers.add_parser("gmail", help="Gmail operations")
+    gmail_sub = gmail_parser.add_subparsers(dest="action", required=True)
+
+    # gmail list
+    p = gmail_sub.add_parser("list", help="List recent messages")
+    p.add_argument("--query", "-q", help="Gmail search query to filter")
+    p.add_argument("--limit", type=int, default=10, help="Max messages to return")
+
+    # gmail read
+    p = gmail_sub.add_parser("read", help="Read a specific message")
+    p.add_argument("message_id", help="Message ID")
+
+    # gmail send
+    p = gmail_sub.add_parser("send", help="Send an email")
+    p.add_argument("--to", required=True, help="Recipient email address")
+    p.add_argument("--subject", required=True, help="Email subject")
+    p.add_argument("--body", required=True, help="Email body text")
+    p.add_argument("--cc", help="CC email address(es)")
+
+    # gmail search
+    p = gmail_sub.add_parser("search", help="Search messages")
+    p.add_argument("query", help="Gmail search query (same syntax as Gmail search bar)")
+    p.add_argument("--limit", type=int, default=10, help="Max results")
+
     args = parser.parse_args()
 
     # Route to command handler
@@ -1129,6 +1371,14 @@ def main():
             "list": cmd_slides_list,
             "add-image": cmd_slides_add_image,
             "set-colors": cmd_slides_set_colors,
+        }
+        handlers[args.action](args)
+    elif args.command == "gmail":
+        handlers = {
+            "list": cmd_gmail_list,
+            "read": cmd_gmail_read,
+            "send": cmd_gmail_send,
+            "search": cmd_gmail_search,
         }
         handlers[args.action](args)
 
