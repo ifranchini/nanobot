@@ -221,6 +221,9 @@ class CronService:
     
     async def _execute_job(self, job: CronJob) -> None:
         """Execute a single job."""
+        # Immediately clear next_run to prevent re-entry if add_job/arm_timer
+        # fires during the on_job callback (which runs the agent loop).
+        job.state.next_run_at_ms = None
         start_ms = _now_ms()
         logger.info(f"Cron: executing job '{job.name}' ({job.id})")
         

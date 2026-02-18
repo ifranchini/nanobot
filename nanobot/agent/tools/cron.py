@@ -26,7 +26,12 @@ class CronTool(Tool):
     
     @property
     def description(self) -> str:
-        return "Schedule reminders and recurring tasks. Actions: add, list, remove."
+        return (
+            "Schedule reminders and recurring tasks. Actions: add, list, remove. "
+            "IMPORTANT: Always pass the user's timezone via the tz parameter "
+            "(e.g. 'America/Los_Angeles') or include timezone offset in the at "
+            "parameter (e.g. '2026-02-12T10:30:00-08:00'). Never use naive datetimes."
+        )
     
     @property
     def parameters(self) -> dict[str, Any]:
@@ -52,11 +57,18 @@ class CronTool(Tool):
                 },
                 "tz": {
                     "type": "string",
-                    "description": "IANA timezone for cron expressions (e.g. 'America/Vancouver')"
+                    "description": (
+                        "IANA timezone (e.g. 'America/Los_Angeles'). "
+                        "Used with cron_expr or at. ALWAYS pass the user's timezone."
+                    ),
                 },
                 "at": {
                     "type": "string",
-                    "description": "ISO datetime for one-time execution (e.g. '2026-02-12T10:30:00')"
+                    "description": (
+                        "ISO datetime for one-time execution. MUST include "
+                        "timezone offset (e.g. '2026-02-12T10:30:00-08:00') "
+                        "or pair with tz parameter."
+                    ),
                 },
                 "job_id": {
                     "type": "string",
@@ -97,15 +109,13 @@ class CronTool(Tool):
             return "Error: message is required for add"
         if not self._channel or not self._chat_id:
             return "Error: no session context (channel/chat_id)"
-        if tz and not cron_expr:
-            return "Error: tz can only be used with cron_expr"
         if tz:
             from zoneinfo import ZoneInfo
             try:
                 ZoneInfo(tz)
             except (KeyError, Exception):
                 return f"Error: unknown timezone '{tz}'"
-        
+
         # Build schedule
         delete_after = False
         if every_seconds:
@@ -115,6 +125,10 @@ class CronTool(Tool):
         elif at:
             from datetime import datetime
             dt = datetime.fromisoformat(at)
+            # If naive datetime and tz provided, localize it
+            if dt.tzinfo is None and tz:
+                from zoneinfo import ZoneInfo
+                dt = dt.replace(tzinfo=ZoneInfo(tz))
             at_ms = int(dt.timestamp() * 1000)
             schedule = CronSchedule(kind="at", at_ms=at_ms)
             delete_after = True
@@ -133,10 +147,22 @@ class CronTool(Tool):
         return f"Created job '{job.name}' (id: {job.id})"
     
     def _list_jobs(self) -> str:
+        from datetime import datetime, timezone
         jobs = self._cron.list_jobs()
         if not jobs:
             return "No scheduled jobs."
-        lines = [f"- {j.name} (id: {j.id}, {j.schedule.kind})" for j in jobs]
+        lines = []
+        for j in jobs:
+            next_run = ""
+            if j.state.next_run_at_ms:
+                dt = datetime.fromtimestamp(j.state.next_run_at_ms / 1000, tz=timezone.utc)
+                next_run = f", next: {dt.strftime('%Y-%m-%d %H:%M UTC')}"
+            sched = j.schedule.kind
+            if j.schedule.expr:
+                sched = f"cron '{j.schedule.expr}'"
+                if j.schedule.tz:
+                    sched += f" ({j.schedule.tz})"
+            lines.append(f"- {j.name} (id: {j.id}, {sched}{next_run})")
         return "Scheduled jobs:\n" + "\n".join(lines)
     
     def _remove_job(self, job_id: str | None) -> str:
