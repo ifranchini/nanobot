@@ -4,9 +4,29 @@
 
 ✅ **Safe to run directly** (standard deploy cycle)
 
+### Full deploy (code + Dockerfile changes)
+
 ```bash
+# 1. Push local changes to stable
+git checkout stable && git reset --hard my-modifications && git push --force-with-lease && git checkout my-modifications
+
+# 2. Pull on VPS
 ssh puma-vps "sudo -u nanobot bash -c 'cd /home/nanobot/nanobot && git pull origin stable'"
+
+# 3. Build and restart container
 ssh puma-vps "sudo bash -c 'cd /home/nanobot/nanobot && docker build -t nanobot . && docker stop nanobot && docker rm nanobot && docker run -d --name nanobot --restart unless-stopped --env-file /home/nanobot/nanobot/.env -p 18790:18790 -v /home/nanobot/.nanobot:/root/.nanobot -v /home/nanobot/nanobot:/repo nanobot gateway'"
+
+# 4. Start fresh Telegram session
+ssh puma-vps "sudo docker exec nanobot nanobot agent --session telegram:6682587663 -m '/new'"
+```
+
+### Quick deploy (skill/config changes only — no Docker rebuild needed)
+
+```bash
+git checkout stable && git reset --hard my-modifications && git push --force-with-lease && git checkout my-modifications
+ssh puma-vps "sudo -u nanobot bash -c 'cd /home/nanobot/nanobot && git pull origin stable'"
+ssh puma-vps "sudo docker restart nanobot"
+ssh puma-vps "sudo docker exec nanobot nanobot agent --session telegram:6682587663 -m '/new'"
 ```
 
 ## View Logs
