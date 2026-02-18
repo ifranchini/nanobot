@@ -6,23 +6,34 @@
 
 ### Full deploy (code + Dockerfile changes)
 
+**ALWAYS: test -> commit -> deploy**
+
 ```bash
-# 1. Push local changes to stable
+# 1. Run tests (must pass before committing)
+uv run pytest -v
+
+# 2. Push local changes to stable
 git checkout stable && git reset --hard my-modifications && git push --force-with-lease && git checkout my-modifications
 
-# 2. Pull on VPS
+# 3. Pull on VPS
 ssh puma-vps "sudo -u nanobot bash -c 'cd /home/nanobot/nanobot && git pull origin stable'"
 
-# 3. Build and restart container
+# 4. Build and restart container
 ssh puma-vps "sudo bash -c 'cd /home/nanobot/nanobot && docker build -t nanobot . && docker stop nanobot && docker rm nanobot && docker run -d --name nanobot --restart unless-stopped --env-file /home/nanobot/nanobot/.env -p 18790:18790 -v /home/nanobot/.nanobot:/root/.nanobot -v /home/nanobot/nanobot:/repo nanobot gateway'"
 
-# 4. Start fresh Telegram session
+# 5. Start fresh Telegram session
 ssh puma-vps "sudo docker exec nanobot nanobot agent --session telegram:6682587663 -m '/new'"
 ```
 
 ### Quick deploy (skill/config changes only — no Docker rebuild needed)
 
+**ALWAYS: test -> commit -> deploy**
+
 ```bash
+# 1. Run tests (must pass before committing)
+uv run pytest -v
+
+# 2. Push local changes to stable
 git checkout stable && git reset --hard my-modifications && git push --force-with-lease && git checkout my-modifications
 ssh puma-vps "sudo -u nanobot bash -c 'cd /home/nanobot/nanobot && git pull origin stable'"
 ssh puma-vps "sudo docker restart nanobot"
