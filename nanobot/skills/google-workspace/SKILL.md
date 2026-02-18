@@ -10,7 +10,9 @@ Manage Google Calendar, Docs, Sheets, and Slides using OAuth2 authentication.
 
 **IMPORTANT**: Use the bundled `google_workspace.py` script via the `exec` tool. Do NOT use web search or curl to access Google APIs -- use the script commands below. Replace `{baseDir}` with the directory containing this SKILL.md file.
 
-**TIMEZONE**: The user's timezone is **America/Los_Angeles** (Pacific Time). ALWAYS pass `--timezone America/Los_Angeles` when creating or updating calendar events. Never omit this flag — the system defaults to UTC otherwise.
+**TIMEZONE**: The user's timezone is **America/Los_Angeles** (Pacific Time). ALWAYS:
+- Pass `--timezone America/Los_Angeles` when creating or updating calendar events.
+- Interpret relative dates like "today", "tomorrow", "this Friday" in **Pacific Time**, NOT the system clock (which is UTC). Calculate the correct date in America/Los_Angeles before passing it to the script.
 
 ## Setup
 
