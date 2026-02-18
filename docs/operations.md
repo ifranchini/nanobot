@@ -106,23 +106,54 @@ ssh puma-vps "sudo docker restart nanobot"
 
 ⚠️ **Ask user to confirm before running**
 
-Normally handled by GitHub Action. Manual sync:
+Normally handled by GitHub Action (daily at 06:00 UTC). Sends Telegram alert on failure.
+
+### When you get a "Sync Failed" Telegram alert
+
+Just tell Claude: **"resolve sync conflict"** — this runbook has all the context needed.
+
+### Resolve sync conflict (Claude runs this)
 
 ```bash
-# Local
+# 1. Fetch latest upstream
 git fetch upstream
+git fetch origin
+
+# 2. Update main to match upstream
 git checkout main
 git reset --hard upstream/main
 git push origin main --force
 
+# 3. Start interactive rebase
 git checkout my-modifications
 git rebase main
-git push --force-with-lease
+# If conflicts: git shows which files conflict.
+# For each conflict:
+#   - Open the file, look for <<<<<<< / ======= / >>>>>>> markers
+#   - Keep OUR custom changes (HEAD), integrate any upstream changes we need
+#   - git add <resolved-file>
+#   - git rebase --continue
+# Repeat until rebase completes.
 
-git checkout stable
-git reset --hard my-modifications
-git push --force
+# 4. Verify no commits were lost
+git log --oneline main..my-modifications
+# Compare count to what's expected. If commits are missing, investigate.
+
+# 5. Run tests before pushing
+uv run pytest -v
+
+# 6. Push and update stable
+git push origin my-modifications --force-with-lease
+git checkout stable && git reset --hard my-modifications && git push --force-with-lease
+git checkout my-modifications
 ```
+
+### Key principles for conflict resolution
+
+- **Always keep our custom changes** — upstream doesn't know about our modifications
+- **Files we commonly customize** (likely to conflict): `commands.py`, `loop.py`, `web.py`
+- **After resolving**: run tests, verify commit count, then push
+- **If unsure about a conflict**: keep both versions and test
 
 ## View Config
 
