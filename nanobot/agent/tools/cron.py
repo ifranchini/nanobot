@@ -64,6 +64,7 @@ class CronTool(Tool):
             f"If tz is omitted, cron expressions and naive ISO times default to {self._default_timezone}."
         )
 
+
     @property
     def parameters(self) -> dict[str, Any]:
         return {
@@ -142,8 +143,6 @@ class CronTool(Tool):
             return "Error: message is required for add"
         if not self._channel or not self._chat_id:
             return "Error: no session context (channel/chat_id)"
-        if tz and not cron_expr:
-            return "Error: tz can only be used with cron_expr"
         if tz:
             if err := self._validate_timezone(tz):
                 return err
@@ -220,6 +219,7 @@ class CronTool(Tool):
         return lines
 
     def _list_jobs(self) -> str:
+        from datetime import datetime, timezone
         jobs = self._cron.list_jobs()
         if not jobs:
             return "No scheduled jobs."
