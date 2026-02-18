@@ -193,10 +193,12 @@ class ChannelManager:
                     timeout=1.0
                 )
                 
+                logger.debug(f"Outbound dispatch: {msg.channel}:{msg.chat_id} ({len(msg.content or '')} chars)")
                 channel = self.channels.get(msg.channel)
                 if channel:
                     try:
                         await channel.send(msg)
+                        logger.debug(f"Outbound dispatch: sent to {msg.channel}")
                     except Exception as e:
                         logger.error(f"Error sending to {msg.channel}: {e}")
                 else:

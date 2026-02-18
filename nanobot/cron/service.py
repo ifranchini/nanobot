@@ -225,12 +225,15 @@ class CronService:
         # fires during the on_job callback (which runs the agent loop).
         job.state.next_run_at_ms = None
         start_ms = _now_ms()
-        logger.info(f"Cron: executing job '{job.name}' ({job.id})")
-        
+        logger.info(f"Cron: executing job '{job.name}' ({job.id}), on_job={'set' if self.on_job else 'NONE'}")
+
         try:
             response = None
             if self.on_job:
                 response = await self.on_job(job)
+                logger.info(f"Cron: on_job returned {len(response) if response else 0} chars")
+            else:
+                logger.warning(f"Cron: NO on_job callback set — job will not deliver!")
             
             job.state.last_status = "ok"
             job.state.last_error = None
