@@ -28,6 +28,8 @@ class CronTool(Tool):
     def description(self) -> str:
         return (
             "Schedule reminders and recurring tasks. Actions: add, list, remove. "
+            "You MUST call this tool whenever the user asks for a reminder — never "
+            "claim a reminder was set without calling this tool first. "
             "IMPORTANT: Always pass the user's timezone via the tz parameter "
             "(e.g. 'America/Los_Angeles') or include timezone offset in the at "
             "parameter (e.g. '2026-02-12T10:30:00-08:00'). Never use naive datetimes."

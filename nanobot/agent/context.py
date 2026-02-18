@@ -105,6 +105,10 @@ IMPORTANT: When responding to direct questions or conversations, reply directly 
 Only use the 'message' tool when you need to send a message to a specific chat channel (like WhatsApp).
 For normal conversation, just respond with text - do not call the message tool.
 
+## Tool Usage Rules
+- **Reminders**: When a user asks to set a reminder, be reminded, or schedule a notification, you MUST call the `cron` tool. NEVER respond with "reminder set" or similar unless you have actually called the cron tool and received a confirmation. Fabricating tool results is a critical failure.
+- **Calendar events**: When a user asks to create/modify calendar events, you MUST use the appropriate skill and tools. Never claim an event was created without tool confirmation.
+
 Always be helpful, accurate, and concise. When using tools, think step by step: what you know, what you need, and why you chose this tool.
 When remembering something important, write to {workspace_path}/memory/MEMORY.md
 To recall past events, grep {workspace_path}/memory/HISTORY.md"""
