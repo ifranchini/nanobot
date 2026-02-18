@@ -18,6 +18,14 @@ SCOPES = [
 ]
 
 
+def _detect_timezone() -> str:
+    """Detect the local system timezone, falling back to UTC."""
+    try:
+        return str(datetime.now().astimezone().tzinfo)
+    except Exception:
+        return "UTC"
+
+
 def _get_creds_dir(args) -> str:
     return getattr(args, "creds_dir", None) or DEFAULT_CREDS_DIR
 
@@ -252,7 +260,7 @@ def cmd_calendar_create(args):
     if args.location:
         event_body["location"] = args.location
 
-    tz = args.timezone or "UTC"
+    tz = args.timezone or _detect_timezone()
 
     if args.all_day:
         event_body["start"] = {"date": args.start[:10]}
