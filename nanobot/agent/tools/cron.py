@@ -7,11 +7,12 @@ from nanobot.agent.tools.base import Tool
 from nanobot.cron.service import CronService
 from nanobot.cron.types import CronSchedule
 
-# Patterns that indicate the message is an actionable task, not a simple reminder
+# Patterns that indicate the message is an actionable task requiring agent processing,
+# not a simple reminder. Only match verbs that imply the AGENT must act (not the user).
 _ACTION_PATTERNS = re.compile(
-    r"\b(send|email|fetch|search|run|execute|create|post|call|download|upload|"
-    r"check|update|delete|remove|build|deploy|push|pull|sync|backup|generate|"
-    r"write|read|open|close|start|stop|restart|install|publish)\b",
+    r"\b(send|email|fetch|search|execute|create|post|download|upload|"
+    r"deploy|push|pull|sync|backup|generate|publish|notify|forward|"
+    r"summarize|analyze|compile|schedule)\b",
     re.IGNORECASE,
 )
 

@@ -387,13 +387,23 @@ def gateway(
             logger.info(f"Cron: delivered reminder to {job.payload.channel}:{job.payload.to}")
             return reminder_msg
 
-        # Otherwise, process through agent (for agent_turn jobs)
+        # Otherwise, process through agent (for agent_turn jobs like "send email")
+        ch = job.payload.channel or "cli"
+        to = job.payload.to or "direct"
         response = await agent.process_direct(
             job.payload.message,
             session_key=f"cron:{job.id}",
-            channel=job.payload.channel or "cli",
-            chat_id=job.payload.to or "direct",
+            channel=ch,
+            chat_id=to,
         )
+        # Deliver the agent's result back to the user
+        if response and to != "direct":
+            await bus.publish_outbound(OutboundMessage(
+                channel=ch,
+                chat_id=to,
+                content=f"\u2705 **Scheduled task completed**\n\n{response}",
+            ))
+            logger.info(f"Cron: delivered task result to {ch}:{to}")
         return response
     cron.on_job = on_cron_job
     
