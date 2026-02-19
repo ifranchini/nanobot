@@ -1,43 +1,52 @@
 """Cron tool for scheduling reminders and tasks."""
 
+import re
 from typing import Any
 
 from nanobot.agent.tools.base import Tool
 from nanobot.cron.service import CronService
 from nanobot.cron.types import CronSchedule
 
+# Patterns that indicate the message is an actionable task, not a simple reminder
+_ACTION_PATTERNS = re.compile(
+    r"\b(send|email|fetch|search|run|execute|create|post|call|download|upload|"
+    r"check|update|delete|remove|build|deploy|push|pull|sync|backup|generate|"
+    r"write|read|open|close|start|stop|restart|install|publish)\b",
+    re.IGNORECASE,
+)
+
 
 class CronTool(Tool):
     """Tool to schedule reminders and recurring tasks."""
-    
+
     def __init__(self, cron_service: CronService):
         self._cron = cron_service
         self._channel = ""
         self._chat_id = ""
-    
+
     def set_context(self, channel: str, chat_id: str) -> None:
         """Set the current session context for delivery."""
         self._channel = channel
         self._chat_id = chat_id
-    
+
     @property
     def name(self) -> str:
         return "cron"
-    
+
     @property
     def description(self) -> str:
         return (
             "Schedule reminders, delayed tasks, and recurring tasks. Actions: add, list, remove. "
             "You MUST call this tool whenever the user asks for a reminder — never "
             "claim a reminder was set without calling this tool first. "
-            "For delayed tasks (e.g. 'send email in 10 min'), set task=true so the "
-            "message is processed by you (the agent) when the timer fires, not just "
-            "delivered as text. "
+            "For delayed tasks (e.g. 'send email in 10 min'), the message is "
+            "auto-detected as actionable and processed by the agent when the timer "
+            "fires. Simple reminders are delivered directly as notifications. "
             "IMPORTANT: Always pass the user's timezone via the tz parameter "
             "(e.g. 'America/Los_Angeles') or include timezone offset in the at "
             "parameter (e.g. '2026-02-12T10:30:00-08:00'). Never use naive datetimes."
         )
-    
+
     @property
     def parameters(self) -> dict[str, Any]:
         return {
@@ -50,7 +59,12 @@ class CronTool(Tool):
                 },
                 "message": {
                     "type": "string",
-                    "description": "Reminder message (for add)"
+                    "description": (
+                        "For reminders: the notification text. "
+                        "For delayed tasks: describe the action to perform "
+                        "(e.g. 'Send email to X with subject Y'). "
+                        "Actionable messages are auto-detected and processed by the agent."
+                    ),
                 },
                 "every_seconds": {
                     "type": "integer",
@@ -79,19 +93,10 @@ class CronTool(Tool):
                     "type": "string",
                     "description": "Job ID (for remove)"
                 },
-                "task": {
-                    "type": "boolean",
-                    "description": (
-                        "If true, the message is processed by the agent when the "
-                        "timer fires (for delayed tasks like 'send email in 10 min'). "
-                        "If false (default), the message is delivered directly as a "
-                        "reminder notification."
-                    ),
-                }
             },
             "required": ["action"]
         }
-    
+
     async def execute(
         self,
         action: str,
@@ -101,17 +106,21 @@ class CronTool(Tool):
         tz: str | None = None,
         at: str | None = None,
         job_id: str | None = None,
-        task: bool = False,
         **kwargs: Any
     ) -> str:
         if action == "add":
-            return self._add_job(message, every_seconds, cron_expr, tz, at, task)
+            return self._add_job(message, every_seconds, cron_expr, tz, at)
         elif action == "list":
             return self._list_jobs()
         elif action == "remove":
             return self._remove_job(job_id)
         return f"Unknown action: {action}"
-    
+
+    @staticmethod
+    def _is_actionable(message: str) -> bool:
+        """Detect if a message is an actionable task vs a simple reminder."""
+        return bool(_ACTION_PATTERNS.search(message))
+
     def _add_job(
         self,
         message: str,
@@ -119,7 +128,6 @@ class CronTool(Tool):
         cron_expr: str | None,
         tz: str | None,
         at: str | None,
-        task: bool = False,
     ) -> str:
         if not message:
             return "Error: message is required for add"
@@ -150,17 +158,21 @@ class CronTool(Tool):
             delete_after = True
         else:
             return "Error: either every_seconds, cron_expr, or at is required"
-        
+
+        # Auto-detect: actionable messages go through agent, simple reminders deliver directly
+        is_task = self._is_actionable(message)
+
         job = self._cron.add_job(
             name=message[:30],
             schedule=schedule,
             message=message,
-            deliver=not task,
+            deliver=not is_task,
             channel=self._channel,
             to=self._chat_id,
             delete_after_run=delete_after,
         )
-        return f"Created job '{job.name}' (id: {job.id})"
+        mode = "task (agent-processed)" if is_task else "reminder (direct delivery)"
+        return f"Created {mode} job '{job.name}' (id: {job.id})"
     
     def _list_jobs(self) -> str:
         from datetime import datetime, timezone

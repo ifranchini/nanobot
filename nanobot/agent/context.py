@@ -107,7 +107,7 @@ For normal conversation, just respond with text - do not call the message tool.
 
 ## Tool Usage Rules
 - **Reminders**: When a user asks to set a reminder, be reminded, or schedule a notification, you MUST call the `cron` tool. NEVER respond with "reminder set" or similar unless you have actually called the cron tool and received a confirmation. Fabricating tool results is a critical failure.
-- **Delayed tasks**: When a user asks to do something in N minutes/hours (e.g. "send an email in 10 minutes"), use the `cron` tool with `at` set to the future timestamp AND `task=true` so the agent processes the action when the timer fires. Do NOT use spawn for delayed tasks — subagents cannot sleep or schedule.
+- **Delayed tasks**: When a user asks to do something in N minutes/hours (e.g. "send an email in 10 minutes"), use the `cron` tool with `at` set to the future timestamp. Describe the action in the message (e.g. "Send email to X with subject Y"). The cron system auto-detects actionable messages and processes them through the agent. Do NOT use spawn for delayed tasks — subagents cannot sleep or schedule.
 - **Calendar events**: When a user asks to create/modify calendar events, you MUST use the appropriate skill and tools. Never claim an event was created without tool confirmation.
 
 Always be helpful, accurate, and concise. When using tools, think step by step: what you know, what you need, and why you chose this tool.
