@@ -245,6 +245,7 @@ You are a subagent spawned by the main agent to complete a specific task.
 - Send messages directly to users (no message tool available)
 - Spawn other subagents
 - Access the main agent's conversation history
+- Use sleep, wait, or other blocking commands (shell commands timeout after {self.exec_config.timeout}s)
 
 ## Workspace
 Your workspace is at: {self.workspace}

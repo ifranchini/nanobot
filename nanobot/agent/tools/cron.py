@@ -27,9 +27,12 @@ class CronTool(Tool):
     @property
     def description(self) -> str:
         return (
-            "Schedule reminders and recurring tasks. Actions: add, list, remove. "
+            "Schedule reminders, delayed tasks, and recurring tasks. Actions: add, list, remove. "
             "You MUST call this tool whenever the user asks for a reminder — never "
             "claim a reminder was set without calling this tool first. "
+            "For delayed tasks (e.g. 'send email in 10 min'), set task=true so the "
+            "message is processed by you (the agent) when the timer fires, not just "
+            "delivered as text. "
             "IMPORTANT: Always pass the user's timezone via the tz parameter "
             "(e.g. 'America/Los_Angeles') or include timezone offset in the at "
             "parameter (e.g. '2026-02-12T10:30:00-08:00'). Never use naive datetimes."
@@ -75,6 +78,15 @@ class CronTool(Tool):
                 "job_id": {
                     "type": "string",
                     "description": "Job ID (for remove)"
+                },
+                "task": {
+                    "type": "boolean",
+                    "description": (
+                        "If true, the message is processed by the agent when the "
+                        "timer fires (for delayed tasks like 'send email in 10 min'). "
+                        "If false (default), the message is delivered directly as a "
+                        "reminder notification."
+                    ),
                 }
             },
             "required": ["action"]
@@ -89,10 +101,11 @@ class CronTool(Tool):
         tz: str | None = None,
         at: str | None = None,
         job_id: str | None = None,
+        task: bool = False,
         **kwargs: Any
     ) -> str:
         if action == "add":
-            return self._add_job(message, every_seconds, cron_expr, tz, at)
+            return self._add_job(message, every_seconds, cron_expr, tz, at, task)
         elif action == "list":
             return self._list_jobs()
         elif action == "remove":
@@ -106,6 +119,7 @@ class CronTool(Tool):
         cron_expr: str | None,
         tz: str | None,
         at: str | None,
+        task: bool = False,
     ) -> str:
         if not message:
             return "Error: message is required for add"
@@ -141,7 +155,7 @@ class CronTool(Tool):
             name=message[:30],
             schedule=schedule,
             message=message,
-            deliver=True,
+            deliver=not task,
             channel=self._channel,
             to=self._chat_id,
             delete_after_run=delete_after,
