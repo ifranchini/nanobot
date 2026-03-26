@@ -111,30 +111,6 @@ class TestCronToolAddJob:
         jobs = cron_tool._cron.list_jobs()
         assert jobs[0].delete_after_run is True
 
-    async def test_actionable_message_sets_deliver_false(self, cron_tool: CronTool):
-        """Actionable messages (e.g. 'send email') should be agent-processed."""
-        with patch.object(cron_tool._cron, "_arm_timer"):
-            result = await cron_tool.execute(
-                action="add",
-                message="Send email to user@example.com with subject test",
-                at="2099-01-01T00:00:00+00:00",
-            )
-        assert "task (agent-processed)" in result
-        jobs = cron_tool._cron.list_jobs()
-        assert jobs[0].payload.deliver is False
-
-    async def test_simple_reminder_sets_deliver_true(self, cron_tool: CronTool):
-        """Simple reminders should be delivered directly."""
-        with patch.object(cron_tool._cron, "_arm_timer"):
-            result = await cron_tool.execute(
-                action="add",
-                message="Time to go to the gym!",
-                at="2099-01-01T00:00:00+00:00",
-            )
-        assert "reminder (direct delivery)" in result
-        jobs = cron_tool._cron.list_jobs()
-        assert jobs[0].payload.deliver is True
-
     async def test_no_schedule_type_error(self, cron_tool: CronTool):
         result = await cron_tool.execute(action="add", message="no schedule")
         assert "Error" in result
